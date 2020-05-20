@@ -1,4 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
 using Newtonsoft.Json;
 
 namespace BlueIrisClient
@@ -47,7 +50,7 @@ namespace BlueIrisClient
             OptionDisplay = optionDisplay;
             OptionValue = optionValue;
             FramesPerSecond = framesPerSecond;
-            Color = color;
+            Color = color.HasValue ? System.Drawing.Color.FromArgb(color.Value & 0xff, (color.Value >> 8) & 0xff, (color.Value >> 16) & 0xff) : default;
             ClipsCreatedCount = clipsCreatedCount;
             IsAlerting = isAlerting;
             IsActive = isActive;
@@ -61,21 +64,19 @@ namespace BlueIrisClient
             IsTriggered = isTriggered;
             IsRecording = isRecording;
             IsManuallyRecording = isManuallyRecording;
-            ManualRecordingElapsedMs = manualRecordingElapsedMs;
-            ManualRecordingLimitMs = manualRecordingLimitMs;
+            ManualRecordingElapsed = manualRecordingElapsedMs.HasValue ? TimeSpan.FromMilliseconds(manualRecordingElapsedMs.Value) : default;
+            ManualRecordingLimit = manualRecordingLimitMs.HasValue ? TimeSpan.FromMilliseconds(manualRecordingLimitMs.Value) : default;
             IsYellow = isYellow;
             Profile = profile;
             IsPanTiltZoomSupported = isPanTiltZoomSupported;
             IsAudioSupported = isAudioSupported;
-            Width = width;
-            Height = height;
+            PixelSize = (width.HasValue || height.HasValue) ? new Size(width ?? 0, height ?? 0) : default;
             TriggerEventCount = triggerEventCount;
             NoSignalEventCount = noSignalEventCount;
             ClipsCount = clipsCount;
-            XSize = xSize;
-            YSize = ySize;
+            GroupDimensions = (xSize.HasValue || ySize.HasValue) ? new Size(xSize ?? 0, ySize ?? 0) : default;
             Group = group;
-            Rects = rects;
+            Rects = rects?.Select(r => new Rectangle(r[0], r[1], r[2]-r[0], r[3]-r[1])).ToList();
             NewAlertsCount = newAlertsCount;
             LastAlert = lastAlert;
             LastAlertUtc = lastAlertUtc;
@@ -100,7 +101,7 @@ namespace BlueIrisClient
         /// <summary>
         /// 24-bit RGB value (red least significant) representing the camera's display color
         /// </summary>
-        public int? Color { get; }
+        public Color? Color { get; }
 
         /// <summary>
         /// The number of clips created since the camera stats were last reset
@@ -155,12 +156,12 @@ namespace BlueIrisClient
         /// <summary>
         /// millisecond since manual recording began
         /// </summary>
-        public int? ManualRecordingElapsedMs { get; }
+        public TimeSpan? ManualRecordingElapsed { get; }
 
         /// <summary>
         /// millisecond limit for a manual recording
         /// </summary>
-        public int? ManualRecordingLimitMs { get; }
+        public TimeSpan? ManualRecordingLimit { get; }
 
         public bool? IsYellow { get; }
 
@@ -174,14 +175,9 @@ namespace BlueIrisClient
         public bool? IsAudioSupported { get; }
 
         /// <summary>
-        /// Frame pixel width
+        /// Frame pixel size
         /// </summary>
-        public int? Width { get; }
-
-        /// <summary>
-        /// Frame pixel height
-        /// </summary>
-        public int? Height { get; }
+        public Size? PixelSize { get; }
 
         /// <summary>
         /// Number of trigger events since last reset
@@ -199,14 +195,9 @@ namespace BlueIrisClient
         public int? ClipsCount { get; }
 
         /// <summary>
-        /// For a group, the number of cameras across
+        /// For a group, the number of cameras across and tall
         /// </summary>
-        public int? XSize { get; }
-
-        /// <summary>
-        /// For a group, the number of cameras tall
-        /// </summary>
-        public int? YSize { get; }
+        public Size? GroupDimensions { get; }
 
         /// <summary>
         /// For a group, an array of the camera short names in the group
@@ -216,7 +207,7 @@ namespace BlueIrisClient
         /// <summary>
         /// For a group, an array of the camera rectangles within the group image
         /// </summary>
-        public IReadOnlyList<int[]>? Rects { get; }
+        public IReadOnlyList<Rectangle>? Rects { get; }
 
         /// <summary>
         /// Per camera, per user number of new alerts
@@ -237,5 +228,7 @@ namespace BlueIrisClient
         /// Formatted string with camera error condition
         /// </summary>
         public string? Error { get; }
+
+        public bool IsGroup => Group != null;
     }
 }

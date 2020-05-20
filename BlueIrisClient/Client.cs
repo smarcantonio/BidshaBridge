@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -14,8 +15,9 @@ namespace BlueIrisClient
 
     public class Client : IDisposable
     {
-        private readonly HttpClient _httpClient;
+        private readonly HttpClient _jsonClient;
         private static readonly JsonSerializerSettings _jsonSettings;
+        private readonly HttpClient _httpClient;
         private string? _session;
 
         static Client()
@@ -26,21 +28,30 @@ namespace BlueIrisClient
             };
         }
 
-        private Client(Uri baseUri)
+        private Client(Uri baseUri, string username, string password)
         {
-            _httpClient = new HttpClient()
+            _jsonClient = new HttpClient()
             {
                 BaseAddress = baseUri,
             };
 
-            _httpClient.DefaultRequestHeaders.Accept.Clear();
-            _httpClient.DefaultRequestHeaders.Accept.Add(
+            _jsonClient.DefaultRequestHeaders.Accept.Clear();
+            _jsonClient.DefaultRequestHeaders.Accept.Add(
                 new MediaTypeWithQualityHeaderValue("application/json"));
+
+            _httpClient = new HttpClient()
+            {
+                BaseAddress = baseUri
+            };
+
+            var basicAuthBytes = Encoding.ASCII.GetBytes($"{username}:{password}");
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(basicAuthBytes));
+
         }
 
         public static async Task<Client> CreateLoggedIn(Uri baseUri, string username, string password)
         {
-            var client = new Client(baseUri);
+            var client = new Client(baseUri, username, password);
             try
             {
                 var loginResponse = await client.LoginAsync(username, password);
@@ -51,7 +62,7 @@ namespace BlueIrisClient
                 }
                 else
                 {
-                    throw new Exception("Failed to log into Blue Iris");
+                    throw new BlueIrisClientException("Failed to log into Blue Iris");
                 }
             }
             catch
@@ -70,7 +81,7 @@ namespace BlueIrisClient
                 Content = content
             };
 
-            using var response = await _httpClient.SendAsync(httpRequest);
+            using var response = await _jsonClient.SendAsync(httpRequest);
             var responseContent = await response.Content.ReadAsStringAsync();
             return JsonConvert.DeserializeObject<TResponse>(responseContent, _jsonSettings)!;
         }
@@ -83,7 +94,7 @@ namespace BlueIrisClient
             });
 
             if (loginResponse.Result != ResponseResult.Fail)
-                throw new Exception($"Unexpected response");
+                throw new BlueIrisClientException($"Unexpected response");
 
             using var md5 = MD5.Create();
 
@@ -104,12 +115,14 @@ namespace BlueIrisClient
         /// Cameras not belonging to any group are shown beneath the "all cameras" group.
         /// Disabled cameras are placed at the end of the list.
         /// </returns>
-        public async Task<Response<IEnumerable<CameraOrGroup>>> GetCameras()
+        public async Task<Response<IEnumerable<CameraOrGroup>>> GetCamerasAndGroups(bool resetStatCounts = false, bool resetNewAlerts = false)
         {
+            int reset = (resetStatCounts ? 1 : 0) + (resetNewAlerts ? 2 : 0);
             var response = await PostJsonAsync<Response<IEnumerable<CameraOrGroup>>>(new
             {
                 cmd = "camlist",
-                session = _session
+                session = _session,
+                reset = reset > 0 ? (int?)reset : default
             });
             return response;
         }
@@ -171,8 +184,20 @@ namespace BlueIrisClient
             });
         }
 
+        public async Task GetImage(string camera)
+        {
+            using var response = await _httpClient.GetAsync($"/image/{camera}");
+            if (!response.IsSuccessStatusCode)
+                throw new BlueIrisClientException($"Failed to download image for camera '{camera}' from Blue Iris. HTTP status code: {response.StatusCode}");
+            var contentBytes = await response.Content.ReadAsByteArrayAsync();
+            var filePath = Path.Join(Path.GetTempPath(), "test.jpg");
+            Console.WriteLine($"Writing file '{filePath}'");
+            await File.WriteAllBytesAsync(filePath, contentBytes);
+        }
+
         public void Dispose()
         {
+            _jsonClient.Dispose();
             _httpClient.Dispose();
         }
     }

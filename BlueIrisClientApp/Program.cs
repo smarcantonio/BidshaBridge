@@ -2,6 +2,7 @@
 using BlueIrisClient;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using System.Linq;
 
 namespace BlueIrisClientApp
 {
@@ -19,25 +20,39 @@ namespace BlueIrisClientApp
                 config["blueIris:username"],
                 config["blueIris:password"]);
 
-            var cameras = await blueIrisClient.GetCameras();
+            var camerasAndGroups = await blueIrisClient.GetCamerasAndGroups();
 
             Console.WriteLine("Cameras:");
-            if (cameras.Data != null)
+            if (camerasAndGroups.Data != null)
             {
-                foreach (var camera in cameras.Data)
+                foreach (var camera in camerasAndGroups.Data.Where(c => !c.IsGroup))
+                    Console.WriteLine($"\t{camera.OptionDisplay} ({camera.OptionValue})");
+            }
+
+            Console.WriteLine("Groups:");
+            if (camerasAndGroups.Data != null)
+            {
+                foreach (var group in camerasAndGroups.Data.Where(c => c.IsGroup))
+                    Console.WriteLine($"\t{group.OptionDisplay} ({group.OptionValue})");
+            }
+
+            while(true)
+            {
+                Console.WriteLine("Press 'T' to trigger or 'I' to get image");
+                switch(Console.ReadKey().Key)
                 {
-                    Console.WriteLine($"{camera.OptionDisplay} ({camera.OptionValue})");
+                    case ConsoleKey.T:
+                        Console.WriteLine("Triggering Drive");
+                        await blueIrisClient.CamSet("Drive", trigger: true);
+                        break;
+                    case ConsoleKey.I:
+                        Console.WriteLine("Capturing image from Drive");
+                        await blueIrisClient.GetImage("Drive");
+                        break;
+                    default:
+                        break;
                 }
             }
-
-            while (true)
-            {
-                Console.WriteLine("Press enter to trigger Drive");
-                Console.ReadLine();
-//                await blueIrisClient.Trigger("Drive");
-                await blueIrisClient.CamSet("Drive", trigger: true);
-            }
-
         }
     }
 }
