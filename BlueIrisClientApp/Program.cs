@@ -34,7 +34,8 @@ namespace TestApp
                 cancellationToken);
 
             using var deepStackClient = await DeepStackClient.Client.CreateLoggedInAsync(
-                new Uri(config["deepstack:uri"]));
+                new Uri(config["deepstack:uri"]),
+                config["deepstack:apiKey"]);
 
             var camerasAndGroups = await blueIrisClient.GetCamerasAndGroups();
 
@@ -113,11 +114,11 @@ namespace TestApp
                 Console.WriteLine("'S' to select camera");
                 Console.WriteLine("'T' to trigger");
                 Console.WriteLine("'I' to get image");
-                Console.WriteLine("'P' to get publish movement on to MQTT");
-                Console.WriteLine("'Q' to get publish movement off to MQTT");
-                Console.WriteLine("'A' to get publish attribute to MQTT");
-                Console.WriteLine("'V' to get publish availability online to MQTT");
-                Console.WriteLine("'C' to get publish auto-discovery config to MQTT");
+                Console.WriteLine("'P' to publish movement:on to MQTT");
+                Console.WriteLine("'Q' to publish movement:off to MQTT");
+                Console.WriteLine("'A' to publish attributes to MQTT");
+                Console.WriteLine("'V' to publish availability:online to MQTT");
+                Console.WriteLine("'C' to publish auto-discovery config to MQTT");
             }
         }
     }

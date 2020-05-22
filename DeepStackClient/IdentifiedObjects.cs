@@ -8,14 +8,11 @@ namespace DeepStackClient
     {
         [JsonConstructor]
         public IdentifiedObjects(
-            [JsonProperty("success")] bool success,
             [JsonProperty("predictions")] IReadOnlyList<IdentifiedObject> predictions)
         {
-            Success = success;
             Predictions = predictions ?? Array.Empty<IdentifiedObject>();
         }
 
-        public bool Success { get; }
-        public IReadOnlyList<IdentifiedObject> Predictions { get; }
+        public IReadOnlyList<IdentifiedObject>? Predictions { get; }
     }
 }
