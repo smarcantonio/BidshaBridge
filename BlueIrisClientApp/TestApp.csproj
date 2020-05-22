@@ -11,5 +11,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\BlueIrisClient\BlueIrisClient.csproj" />
+    <ProjectReference Include="..\DeepStackClient\DeepStackClient.csproj" />
+    <ProjectReference Include="..\HomeAssistantClient\HomeAssistantClient.csproj" />
   </ItemGroup>
 </Project>

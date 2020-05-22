@@ -7,6 +7,7 @@ using System.Net.Http.Headers;
 using System.Security;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 
@@ -16,8 +17,10 @@ namespace BlueIrisClient
     public class Client : IDisposable
     {
         private readonly HttpClient _jsonClient;
-        private static readonly JsonSerializerSettings _jsonSettings;
         private readonly HttpClient _httpClient;
+        private readonly string _username;
+        private readonly string _password;
+        private static readonly JsonSerializerSettings _jsonSettings;
         private string? _session;
 
         static Client()
@@ -30,6 +33,9 @@ namespace BlueIrisClient
 
         private Client(Uri baseUri, string username, string password)
         {
+            _username = username;
+            _password = password;
+
             _jsonClient = new HttpClient()
             {
                 BaseAddress = baseUri,
@@ -49,12 +55,14 @@ namespace BlueIrisClient
 
         }
 
-        public static async Task<Client> CreateLoggedIn(Uri baseUri, string username, string password)
+        public static async Task<Client> CreateLoggedInAsync(
+            Uri baseUri, string username, string password,
+            CancellationToken cancellationToken = default)
         {
             var client = new Client(baseUri, username, password);
             try
             {
-                var loginResponse = await client.LoginAsync(username, password);
+                var loginResponse = await client.LoginAsync(cancellationToken);
                 if (loginResponse.Result == ResponseResult.Success && loginResponse.Session != null)
                 {
                     client._session = loginResponse.Session;
@@ -72,7 +80,8 @@ namespace BlueIrisClient
             }
         }
 
-        private async Task<TResponse> PostJsonAsync<TResponse>(object request) where TResponse : Response
+        private async Task<TResponse> PostJsonAsync<TResponse>(
+            object request, CancellationToken cancellationToken = default) where TResponse : Response
         {
             using var content = new StringContent(JsonConvert.SerializeObject(request, _jsonSettings));
 
@@ -81,17 +90,17 @@ namespace BlueIrisClient
                 Content = content
             };
 
-            using var response = await _jsonClient.SendAsync(httpRequest);
+            using var response = await _jsonClient.SendAsync(httpRequest, cancellationToken);
             var responseContent = await response.Content.ReadAsStringAsync();
             return JsonConvert.DeserializeObject<TResponse>(responseContent, _jsonSettings)!;
         }
 
-        private async Task<Response<LoginResponse>> LoginAsync(string username, string password)
+        private async Task<Response<LoginResponse>> LoginAsync(CancellationToken cancellationToken = default)
         {
             var loginResponse = await PostJsonAsync<Response<LoginResponse>>(new
             {
                 cmd = "login"
-            });
+            }, cancellationToken);
 
             if (loginResponse.Result != ResponseResult.Fail)
                 throw new BlueIrisClientException($"Unexpected response");
@@ -99,7 +108,7 @@ namespace BlueIrisClient
             using var md5 = MD5.Create();
 
             var authHash = BitConverter.ToString(
-               md5.ComputeHash(Encoding.UTF8.GetBytes($"{username}:{loginResponse.Session}:{password}")))
+               md5.ComputeHash(Encoding.UTF8.GetBytes($"{_username}:{loginResponse.Session}:{_password}")))
                .Replace("-", string.Empty);
 
             return await PostJsonAsync<Response<LoginResponse>>(new
@@ -107,7 +116,7 @@ namespace BlueIrisClient
                 cmd = "login",
                 session = loginResponse.Session,
                 response = authHash
-            });
+            }, cancellationToken);
         }
 
         /// <returns>
@@ -115,7 +124,9 @@ namespace BlueIrisClient
         /// Cameras not belonging to any group are shown beneath the "all cameras" group.
         /// Disabled cameras are placed at the end of the list.
         /// </returns>
-        public async Task<Response<IEnumerable<CameraOrGroup>>> GetCamerasAndGroups(bool resetStatCounts = false, bool resetNewAlerts = false)
+        public async Task<Response<IEnumerable<CameraOrGroup>>> GetCamerasAndGroups(
+            bool resetStatCounts = false, bool resetNewAlerts = false,
+            CancellationToken cancellationToken = default)
         {
             int reset = (resetStatCounts ? 1 : 0) + (resetNewAlerts ? 2 : 0);
             var response = await PostJsonAsync<Response<IEnumerable<CameraOrGroup>>>(new
@@ -123,7 +134,7 @@ namespace BlueIrisClient
                 cmd = "camlist",
                 session = _session,
                 reset = reset > 0 ? (int?)reset : default
-            });
+            }, cancellationToken);
             return response;
         }
 
@@ -162,37 +173,42 @@ namespace BlueIrisClient
             int? upPreset = null,
             int? downPreset = null,
             string? target = null,
-            int? move = null)
+            int? move = null,
+            CancellationToken cancellationToken = default)
         {
             var zoomArray = zoom.HasValue ? new float[] { zoom.Value.factor, zoom.Value.x1, zoom.Value.y1, zoom.Value.x2, zoom.Value.y2 } : null;
 
-            await PostJsonAsync<Response>(new {
-                cmd = "camset",
-                session = _session,
-                camera,
-                click, audio, delete, ptz, trigger, reset, enable, video, zoom = zoomArray, snapPreset, clearPreset, upPreset, downPreset, target, move
-                });
+            await PostJsonAsync<Response>(
+                new {
+                    cmd = "camset",
+                    session = _session,
+                    camera,
+                    click, audio, delete, ptz, trigger, reset, enable, video, zoom = zoomArray, snapPreset, clearPreset, upPreset, downPreset, target, move
+                },
+                cancellationToken);
         }
 
-        public async Task Trigger(string camera)
+        public async Task Trigger(string camera, CancellationToken cancellationToken = default)
         {
-            await PostJsonAsync<Response>(new
-            {
-                cmd = "trigger",
-                session = _session,
-                camera
-            });
+            await PostJsonAsync<Response>(
+                new
+                {
+                    cmd = "trigger",
+                    session = _session,
+                    camera
+                },
+                cancellationToken);
         }
 
-        public async Task GetImage(string camera)
+        public async Task GetImage(string camera, CancellationToken cancellationToken = default)
         {
-            using var response = await _httpClient.GetAsync($"/image/{camera}");
+            using var response = await _httpClient.GetAsync($"/image/{camera}", cancellationToken);
             if (!response.IsSuccessStatusCode)
                 throw new BlueIrisClientException($"Failed to download image for camera '{camera}' from Blue Iris. HTTP status code: {response.StatusCode}");
             var contentBytes = await response.Content.ReadAsByteArrayAsync();
             var filePath = Path.Join(Path.GetTempPath(), "test.jpg");
             Console.WriteLine($"Writing file '{filePath}'");
-            await File.WriteAllBytesAsync(filePath, contentBytes);
+            await File.WriteAllBytesAsync(filePath, contentBytes, cancellationToken);
         }
 
         public void Dispose()

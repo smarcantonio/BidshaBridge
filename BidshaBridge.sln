@@ -7,16 +7,16 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BidshaBridge", "BidshaBridg
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BlueIrisClient", "BlueIrisClient\BlueIrisClient.csproj", "{52D1E2FA-C615-48F2-AF12-5074A918DD62}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BlueIrisClientApp", "BlueIrisClientApp\BlueIrisClientApp.csproj", "{DB1F259C-0595-4453-995C-02A646E61321}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestApp", "BlueIrisClientApp\TestApp.csproj", "{DB1F259C-0595-4453-995C-02A646E61321}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{FA8ACFD2-33EA-41AA-9FA8-9FA690685025}"
 	ProjectSection(SolutionItems) = preProject
 		.editorconfig = .editorconfig
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DeepStackClient", "DeepStackClient\DeepStackClient.csproj", "{AE45EDD4-7501-4438-BB70-0D7AEFE859BD}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DeepStackClient", "DeepStackClient\DeepStackClient.csproj", "{AE45EDD4-7501-4438-BB70-0D7AEFE859BD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HomeAssistantClient", "HomeAssistantClient\HomeAssistantClient.csproj", "{906F77E8-C4FE-4AC9-B1F3-D7278CA12C7A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HomeAssistantClient", "HomeAssistantClient\HomeAssistantClient.csproj", "{906F77E8-C4FE-4AC9-B1F3-D7278CA12C7A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
