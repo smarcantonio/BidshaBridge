@@ -200,15 +200,12 @@ namespace BlueIrisClient
                 cancellationToken);
         }
 
-        public async Task GetImage(string camera, CancellationToken cancellationToken = default)
+        public async Task<byte[]> GetImage(string camera, CancellationToken cancellationToken = default)
         {
             using var response = await _httpClient.GetAsync($"/image/{camera}", cancellationToken);
             if (!response.IsSuccessStatusCode)
                 throw new BlueIrisClientException($"Failed to download image for camera '{camera}' from Blue Iris. HTTP status code: {response.StatusCode}");
-            var contentBytes = await response.Content.ReadAsByteArrayAsync();
-            var filePath = Path.Join(Path.GetTempPath(), "test.jpg");
-            Console.WriteLine($"Writing file '{filePath}'");
-            await File.WriteAllBytesAsync(filePath, contentBytes, cancellationToken);
+            return await response.Content.ReadAsByteArrayAsync();
         }
 
         public void Dispose()

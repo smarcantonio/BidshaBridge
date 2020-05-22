@@ -33,6 +33,9 @@ namespace TestApp
                 "homeassistant",
                 cancellationToken);
 
+            using var deepStackClient = await DeepStackClient.Client.CreateLoggedInAsync(
+                new Uri(config["deepstack:uri"]));
+
             var camerasAndGroups = await blueIrisClient.GetCamerasAndGroups();
 
             Console.WriteLine("Cameras:");
@@ -75,7 +78,9 @@ namespace TestApp
                         break;
                     case ConsoleKey.I:
                         Console.WriteLine($"Capturing image from {selectedCamera!.OptionValue}");
-                        await blueIrisClient.GetImage(selectedCamera!.OptionValue!);
+                        var jpegBytes = await blueIrisClient.GetImage(selectedCamera!.OptionValue!);
+                        var analysis = await deepStackClient.IdentifyObjects(jpegBytes);
+                        Console.WriteLine(analysis);
                         break;
                     case ConsoleKey.P:
                         Console.WriteLine($"Publishing MQTT message to set motion trigger for '{selectedCamera!.OptionValue}'");
