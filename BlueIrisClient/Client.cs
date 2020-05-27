@@ -11,6 +11,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.WebUtilities;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 
 namespace BlueIrisClient
 {
@@ -28,7 +29,11 @@ namespace BlueIrisClient
         {
             _jsonSettings = new JsonSerializerSettings()
             {
-                NullValueHandling = NullValueHandling.Ignore
+                NullValueHandling = NullValueHandling.Ignore,
+                Converters = new[]
+                {
+                    new CameraOrGroupJsonConverter()
+                }
             };
         }
 
@@ -39,7 +44,7 @@ namespace BlueIrisClient
 
             _jsonClient = new HttpClient()
             {
-                BaseAddress = baseUri,
+                BaseAddress = baseUri
             };
 
             _jsonClient.DefaultRequestHeaders.Accept.Clear();
@@ -52,8 +57,8 @@ namespace BlueIrisClient
             };
 
             var basicAuthBytes = Encoding.ASCII.GetBytes($"{username}:{password}");
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(basicAuthBytes));
-
+            _httpClient.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Basic", Convert.ToBase64String(basicAuthBytes));
         }
 
         public static async Task<Client> CreateLoggedInAsync(
@@ -129,12 +134,12 @@ namespace BlueIrisClient
         /// Cameras not belonging to any group are shown beneath the "all cameras" group.
         /// Disabled cameras are placed at the end of the list.
         /// </returns>
-        public async Task<Response<IEnumerable<CameraOrGroup>>> GetCamerasAndGroups(
+        public async Task<Response<IEnumerable<CameraOrGroupBase>>> GetCamerasAndGroups(
             bool resetStatCounts = false, bool resetNewAlerts = false,
             CancellationToken cancellationToken = default)
         {
             int reset = (resetStatCounts ? 1 : 0) + (resetNewAlerts ? 2 : 0);
-            var response = await PostJsonAsync<Response<IEnumerable<CameraOrGroup>>>(new
+            var response = await PostJsonAsync<Response<IEnumerable<CameraOrGroupBase>>>(new
             {
                 cmd = "camlist",
                 session = _session,
