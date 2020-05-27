@@ -13,6 +13,6 @@ namespace DeepStackClient
             Predictions = predictions ?? Array.Empty<IdentifiedObject>();
         }
 
-        public IReadOnlyList<IdentifiedObject>? Predictions { get; }
+        public IReadOnlyList<IdentifiedObject> Predictions { get; }
     }
 }

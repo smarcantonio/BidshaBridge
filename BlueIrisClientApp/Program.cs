@@ -38,93 +38,19 @@ namespace TestApp
                 new Uri(config["deepstack:uri"]),
                 config["deepstack:apiKey"]);
 
-            var camerasAndGroups = await blueIrisClient.GetCamerasAndGroups();
+            var cameras = (await blueIrisClient.GetCamerasAndGroups()).Data.Where(c => !c.IsGroup).ToList();
 
-            Console.WriteLine("Cameras:");
-            if (camerasAndGroups.Data != null)
+            if (cameras == null || cameras.Count == 0)
             {
-                foreach (var camera in camerasAndGroups.Data.Where(c => !c.IsGroup))
-                    Console.WriteLine($"\t{camera.OptionDisplay} ({camera.OptionValue})");
+                Console.WriteLine("No cameras found");
+                return;
             }
 
-            Console.WriteLine("Groups:");
-            if (camerasAndGroups.Data != null)
-            {
-                foreach (var group in camerasAndGroups.Data.Where(c => c.IsGroup))
-                    Console.WriteLine($"\t{group.OptionDisplay} ({group.OptionValue})");
-            }
 
-            CameraOrGroup? selectedCamera = null;
+            CameraOrGroup selectedCamera = cameras.First();
             while (true)
             {
-                switch (selectedCamera == null ? ConsoleKey.S : Console.ReadKey(true).Key)
-                {
-                    case ConsoleKey.S:
-                        Console.WriteLine("Enter short name of camera");
-                        var enteredText = Console.ReadLine();
-                        var newCamera = camerasAndGroups.Data.FirstOrDefault(c => !c.IsGroup && string.Equals(c.OptionValue, enteredText, StringComparison.InvariantCultureIgnoreCase));
-                        if (!string.IsNullOrWhiteSpace(newCamera?.OptionValue))
-                        {
-                            selectedCamera = newCamera;
-                            Console.WriteLine($"Camera set to '{selectedCamera.OptionValue}'");
-                        }
-                        else
-                        {
-                            Console.WriteLine($"Could not find camera called '{enteredText}'");
-                            continue;
-                        }
-                        break;
-                    case ConsoleKey.T:
-                        Console.WriteLine($"Triggering '{selectedCamera!.OptionValue}");
-                        await blueIrisClient.CamSet(selectedCamera!.OptionValue!, trigger: true);
-                        break;
-                    case ConsoleKey.I:
-                        Console.WriteLine($"Capturing image from {selectedCamera!.OptionValue}");
-                        var jpegBytes = await blueIrisClient.GetImage(selectedCamera!.OptionValue!);
-                        var analysis = await deepStackClient.IdentifyObjects(jpegBytes);
-                        Console.WriteLine(analysis);
-                        break;
-                    case ConsoleKey.M:
-                        Console.WriteLine($"Capturing mjpeg image sequence from {selectedCamera!.OptionValue}");
-                        await foreach(var imageStream in blueIrisClient.GetImageStream(selectedCamera!.OptionValue, 2))
-                        {
-                            var sw = Stopwatch.StartNew();
-                            var analysis2 = await deepStackClient.IdentifyObjects(imageStream);
-                            Console.WriteLine($"Analysed image in {sw.Elapsed}. Predictions:");
-                            foreach(var prediction in analysis2.Predictions)
-                            {
-                                Console.WriteLine($"\t{prediction.Label} ({prediction.Confidence} %)");
-                            }
-                        }
-                        break;
-                    case ConsoleKey.P:
-                        Console.WriteLine($"Publishing MQTT message to set motion trigger for '{selectedCamera!.OptionValue}'");
-                        await homeAssistantClient.SetMqttBinarySensorStateAsync($"{selectedCamera.OptionValue}_motion".ToLowerInvariant(), BinarySensorState.On);
-                        break;
-                    case ConsoleKey.Q:
-                        Console.WriteLine($"Publishing MQTT message to clear motion trigger for '{selectedCamera!.OptionValue}'");
-                        await homeAssistantClient.SetMqttBinarySensorStateAsync($"{selectedCamera.OptionValue}_motion".ToLowerInvariant(), BinarySensorState.Off);
-                        break;
-                    case ConsoleKey.A:
-                        Console.WriteLine($"Publishing MQTT message to set attribute for '{selectedCamera!.OptionValue}'");
-                        await homeAssistantClient.SetMqttSensorAttributesAsync($"{selectedCamera.OptionValue}_motion".ToLowerInvariant(), new Dictionary<string, object?> { { "humans", 1 }, { "dogs", 2 } });
-                        break;
-                    case ConsoleKey.V:
-                        Console.WriteLine($"Publishing MQTT message to set availability online for '{selectedCamera!.OptionValue}'");
-                        await homeAssistantClient.SetMqttSensorAvailabilityAsync($"{selectedCamera.OptionValue}_motion".ToLowerInvariant(), BinarySensorAvailability.Online);
-                        break;
-                    case ConsoleKey.C:
-                        Console.WriteLine($"Publishing MQTT message containing config to auto-discover '{selectedCamera!.OptionValue}'");
-                        await homeAssistantClient.ConfigureMqttBinarySensor(
-                            $"{selectedCamera!.OptionDisplay ?? selectedCamera!.OptionValue} Motion",
-                            $"{selectedCamera!.OptionValue}_motion",
-                            selectedCamera!.OptionDisplay ?? selectedCamera!.OptionValue!,
-                            selectedCamera!.OptionValue!,
-                            DeviceClass.Motion);
-                        break;
-                    default:
-                        break;
-                }
+                Console.WriteLine($"Selected camera: {selectedCamera.OptionDisplay} ({selectedCamera.OptionValue})");
                 Console.WriteLine("'S' to select camera");
                 Console.WriteLine("'T' to trigger");
                 Console.WriteLine("'I' to get image");
@@ -134,6 +60,111 @@ namespace TestApp
                 Console.WriteLine("'A' to publish attributes to MQTT");
                 Console.WriteLine("'V' to publish availability:online to MQTT");
                 Console.WriteLine("'C' to publish auto-discovery config to MQTT");
+
+                switch (Console.ReadKey(true).Key)
+                {
+                    case ConsoleKey.S:
+                        {
+                            Console.WriteLine("Cameras:");
+                            foreach (var camera in cameras)
+                                Console.WriteLine($"\t{camera.OptionDisplay} ({camera.OptionValue})");
+                            Console.WriteLine("Enter short name of camera:");
+                            var enteredText = Console.ReadLine();
+                            var newCamera = cameras
+                                .FirstOrDefault(c => string.Equals(c.OptionValue, enteredText, StringComparison.InvariantCultureIgnoreCase));
+                            if (!string.IsNullOrWhiteSpace(newCamera?.OptionValue))
+                            {
+                                selectedCamera = newCamera;
+                                Console.WriteLine($"Camera set to '{selectedCamera.OptionValue}'");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"Could not find camera called '{enteredText}'");
+                                continue;
+                            }
+                        }
+                        break;
+
+                    case ConsoleKey.T:
+                        {
+                            Console.WriteLine($"Triggering '{selectedCamera.OptionValue}");
+                            await blueIrisClient.CamSet(selectedCamera.OptionValue!, trigger: true);
+                        }
+                        break;
+
+                    case ConsoleKey.I:
+                        {
+                            Console.WriteLine($"Capturing image from {selectedCamera!.OptionValue}");
+                            var jpegBytes = await blueIrisClient.GetImage(selectedCamera!.OptionValue!);
+                            var sw = Stopwatch.StartNew();
+                            var analysis = await deepStackClient.IdentifyObjects(jpegBytes);
+                            Console.WriteLine($"Analysed image in {sw.Elapsed}. Predictions:");
+                            foreach (var prediction in analysis.Predictions)
+                            {
+                                Console.WriteLine($"\t{prediction.Label} ({prediction.Confidence} %)");
+                            }
+                        }
+                        break;
+
+                    case ConsoleKey.M:
+                        {
+                            Console.WriteLine($"Capturing mjpeg image sequence from {selectedCamera.OptionValue}");
+                            await foreach (var imageStream in blueIrisClient.GetImageStream(selectedCamera.OptionValue!, 2))
+                            {
+                                var sw = Stopwatch.StartNew();
+                                var analysis = await deepStackClient.IdentifyObjects(imageStream);
+                                Console.WriteLine($"Analysed image in {sw.Elapsed}. Predictions:");
+                                foreach (var prediction in analysis.Predictions)
+                                {
+                                    Console.WriteLine($"\t{prediction.Label} ({prediction.Confidence} %)");
+                                }
+                            }
+                        }
+                        break;
+
+                    case ConsoleKey.P:
+                        {
+                            Console.WriteLine($"Publishing MQTT message to set motion trigger for '{selectedCamera!.OptionValue}'");
+                            await homeAssistantClient.SetMqttBinarySensorStateAsync($"{selectedCamera.OptionValue}_motion".ToLowerInvariant(), BinarySensorState.On);
+                        }
+                        break;
+
+                    case ConsoleKey.Q:
+                        {
+                            Console.WriteLine($"Publishing MQTT message to clear motion trigger for '{selectedCamera!.OptionValue}'");
+                            await homeAssistantClient.SetMqttBinarySensorStateAsync($"{selectedCamera.OptionValue}_motion".ToLowerInvariant(), BinarySensorState.Off);
+                        }
+                        break;
+
+                    case ConsoleKey.A:
+                        {
+                            Console.WriteLine($"Publishing MQTT message to set attribute for '{selectedCamera!.OptionValue}'");
+                            await homeAssistantClient.SetMqttSensorAttributesAsync($"{selectedCamera.OptionValue}_motion".ToLowerInvariant(), new Dictionary<string, object?> { { "humans", 1 }, { "dogs", 2 } });
+                        }
+                        break;
+
+                    case ConsoleKey.V:
+                        {
+                            Console.WriteLine($"Publishing MQTT message to set availability online for '{selectedCamera!.OptionValue}'");
+                            await homeAssistantClient.SetMqttSensorAvailabilityAsync($"{selectedCamera.OptionValue}_motion".ToLowerInvariant(), BinarySensorAvailability.Online);
+                        }
+                        break;
+
+                    case ConsoleKey.C:
+                        {
+                            Console.WriteLine($"Publishing MQTT message containing config to auto-discover '{selectedCamera!.OptionValue}'");
+                            await homeAssistantClient.ConfigureMqttBinarySensor(
+                                $"{selectedCamera!.OptionDisplay ?? selectedCamera!.OptionValue} Motion",
+                                $"{selectedCamera!.OptionValue}_motion",
+                                selectedCamera!.OptionDisplay ?? selectedCamera!.OptionValue!,
+                                selectedCamera!.OptionValue!,
+                                DeviceClass.Motion);
+                        }
+                        break;
+
+                    default:
+                        break;
+                }
             }
         }
     }

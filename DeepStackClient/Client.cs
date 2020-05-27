@@ -22,9 +22,9 @@ namespace DeepStackClient
         }
 
         // Not really necessary but it follows the pattern of the other two clients
-        public static async Task<Client> CreateLoggedInAsync(Uri uri, string apiKey)
+        public static Task<Client> CreateLoggedInAsync(Uri uri, string apiKey)
         {
-            return new Client(uri, apiKey);
+            return Task.FromResult(new Client(uri, apiKey));
         }
 
         private async Task<T> IdentifyImage<T>(Stream jpegImageData, string mode)
@@ -40,8 +40,9 @@ namespace DeepStackClient
             var jObject = JObject.Parse(jsonString);
             if (jObject == null)
                 throw new DeepStackException("Failed to parse response");
-            if (!jObject.SelectToken("success").Value<bool>())
-                throw jObject.ToObject<DeepStackException>();
+            var success = jObject.SelectToken("success")?.Value<bool>();
+            if (success != true)
+                throw jObject.ToObject<DeepStackException>()!;
             
             return JsonConvert.DeserializeObject<T>(jsonString);
         }

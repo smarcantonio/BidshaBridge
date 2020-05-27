@@ -57,11 +57,18 @@ namespace HomeAssistantClient
             var factory = new MqttFactory();
             var mqttClient = factory.CreateMqttClient();
 
+            var portEtc = mqttUri.Scheme.ToLowerInvariant() switch
+            {
+                "mqtt" => new { Port = 1883, UseTls = false },
+                "mqtts" => new { Port = 8883, UseTls = true },
+                _ => throw new HomeAssistantException($"Invalid URI scheme: {mqttUri.Scheme}")
+            };
+
             var options = new MqttClientOptionsBuilder()
-                .WithTcpServer(mqttUri.Host, mqttUri.Scheme switch {"mqtt" => 1883, "mqtts" => 8883 })
+                .WithTcpServer(mqttUri.Host, portEtc.Port)
                 .WithTls(options =>
                 {
-                    options.UseTls = mqttUri.Scheme switch { "mqtt" => false, "mqtts" => true };
+                    options.UseTls = portEtc.UseTls;
                 })
                 .WithCredentials(mqttUsername, mqttPassword)
                 .Build();
@@ -85,7 +92,8 @@ namespace HomeAssistantClient
             {
                 DeviceType.Sensor => "sensor",
                 DeviceType.BinarySensor => "binary_sensor",
-                DeviceType.Switch => "switch"
+                DeviceType.Switch => "switch",
+                _ => throw new ArgumentOutOfRangeException(nameof(deviceType))
             };
 
             return $"{discoveryPrefix}/{deviceTypeString}/{objectId}/{property}".ToLowerInvariant();
@@ -110,7 +118,8 @@ namespace HomeAssistantClient
         {
             var deviceClassString = deviceClass switch
             {
-                DeviceClass.Motion => "motion"
+                DeviceClass.Motion => "motion",
+                _ => throw new ArgumentOutOfRangeException(nameof(deviceClass))
             };
 
             var publishResult = await _mqttClient.PublishAsync(new MqttApplicationMessage
@@ -125,13 +134,14 @@ namespace HomeAssistantClient
                         state_topic = BuildMqttTopic(_mqttDiscoveryPrefix, DeviceType.BinarySensor, sensorId, "state"),
                         availability_topic = BuildMqttTopic(_mqttDiscoveryPrefix, DeviceType.BinarySensor, sensorId, "availability"),
                         json_attributes_topic = BuildMqttTopic(_mqttDiscoveryPrefix, DeviceType.BinarySensor, sensorId, "attributes"),
-                        device = new {
+                        device = new
+                        {
                             name = deviceName,
                             identifiers = deviceId
                         }
                     })),
-//                Retain = true,
-                }, cancellationToken);
+                //                Retain = true,
+            }, cancellationToken);
 
             if (publishResult.ReasonCode != MQTTnet.Client.Publishing.MqttClientPublishReasonCode.Success)
                 throw new HomeAssistantException($"Failed to publish MQTT message: {publishResult.ReasonCode} {publishResult.ReasonString}");
@@ -174,10 +184,10 @@ namespace HomeAssistantClient
                 throw new HomeAssistantException($"Failed to publish MQTT message: {publishResult.ReasonCode} {publishResult.ReasonString}");
         }
 
-        public async Task SetHttpBinarySensorAsync(string objectId, BinarySensorState state)
-        {
-            throw new NotImplementedException();
-        }
+        //public Task SetHttpBinarySensorAsync(string objectId, BinarySensorState state)
+        //{
+        //    throw new NotImplementedException();
+        //}
 
         public void Dispose()
         {
