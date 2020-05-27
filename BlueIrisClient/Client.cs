@@ -1,14 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
-using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Security;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.WebUtilities;
 using Newtonsoft.Json;
 
 namespace BlueIrisClient
@@ -92,6 +93,10 @@ namespace BlueIrisClient
 
             using var response = await _jsonClient.SendAsync(httpRequest, cancellationToken);
             var responseContent = await response.Content.ReadAsStringAsync();
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new BlueIrisClientException(responseContent);
+            }
             return JsonConvert.DeserializeObject<TResponse>(responseContent, _jsonSettings)!;
         }
 
@@ -206,6 +211,46 @@ namespace BlueIrisClient
             if (!response.IsSuccessStatusCode)
                 throw new BlueIrisClientException($"Failed to download image for camera '{camera}' from Blue Iris. HTTP status code: {response.StatusCode}");
             return await response.Content.ReadAsByteArrayAsync();
+        }
+
+        public async IAsyncEnumerable<Stream> GetImageStream(string camera, decimal framesPerSecond, [EnumeratorCancellation]CancellationToken cancellationToken = default)
+        {
+            using var response = await _httpClient.GetAsync($"/mjpg/{camera}?fps={framesPerSecond}", HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+                throw new BlueIrisClientException($"Failed to download image for camera '{camera}' from Blue Iris. HTTP status code: {response.StatusCode}");
+            if (!TryGetMultipartBoundary(response.Content, out var boundary))
+                throw new BlueIrisClientException($"Could not extract multi-part data from mjpeg response stream");
+
+            var multipartReader = new MultipartReader(boundary, await response.Content.ReadAsStreamAsync());
+            var frame = await multipartReader.ReadNextSectionAsync(cancellationToken);
+            while (frame != null)
+            {
+                yield return frame.Body;
+                frame = await multipartReader.ReadNextSectionAsync(cancellationToken);
+            }
+        }
+
+        private static bool TryGetMultipartBoundary(HttpContent content, [MaybeNullWhen(false)]out string boundary)
+        {
+            foreach(var header in content.Headers)
+            {
+                if (!header.Key.Equals("Content-Type", StringComparison.InvariantCultureIgnoreCase))
+                    continue;
+                foreach (var value in header.Value)
+                {
+                    var parts = value.Split(";");
+                    if (parts.Length != 2)
+                        continue;
+                    if (!parts[0].Equals("multipart/x-mixed-replace"))
+                        continue;
+                    if (!parts[1].StartsWith("boundary=", StringComparison.InvariantCultureIgnoreCase))
+                        continue;
+                    boundary = parts[1].Substring("boundary=".Length);
+                    return true;
+                }
+            }
+            boundary = default;
+            return false;
         }
 
         public void Dispose()

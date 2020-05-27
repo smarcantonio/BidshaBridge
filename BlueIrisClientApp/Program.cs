@@ -6,6 +6,7 @@ using System.Threading;
 using HomeAssistantClient;
 using System.Collections.Generic;
 using BlueIrisClient;
+using System.Diagnostics;
 
 namespace TestApp
 {
@@ -83,6 +84,19 @@ namespace TestApp
                         var analysis = await deepStackClient.IdentifyObjects(jpegBytes);
                         Console.WriteLine(analysis);
                         break;
+                    case ConsoleKey.M:
+                        Console.WriteLine($"Capturing mjpeg image sequence from {selectedCamera!.OptionValue}");
+                        await foreach(var imageStream in blueIrisClient.GetImageStream(selectedCamera!.OptionValue, 2))
+                        {
+                            var sw = Stopwatch.StartNew();
+                            var analysis2 = await deepStackClient.IdentifyObjects(imageStream);
+                            Console.WriteLine($"Analysed image in {sw.Elapsed}. Predictions:");
+                            foreach(var prediction in analysis2.Predictions)
+                            {
+                                Console.WriteLine($"\t{prediction.Label} ({prediction.Confidence} %)");
+                            }
+                        }
+                        break;
                     case ConsoleKey.P:
                         Console.WriteLine($"Publishing MQTT message to set motion trigger for '{selectedCamera!.OptionValue}'");
                         await homeAssistantClient.SetMqttBinarySensorStateAsync($"{selectedCamera.OptionValue}_motion".ToLowerInvariant(), BinarySensorState.On);
@@ -114,6 +128,7 @@ namespace TestApp
                 Console.WriteLine("'S' to select camera");
                 Console.WriteLine("'T' to trigger");
                 Console.WriteLine("'I' to get image");
+                Console.WriteLine("'M' to get mjpeg");
                 Console.WriteLine("'P' to publish movement:on to MQTT");
                 Console.WriteLine("'Q' to publish movement:off to MQTT");
                 Console.WriteLine("'A' to publish attributes to MQTT");

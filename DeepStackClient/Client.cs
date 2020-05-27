@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
@@ -26,11 +27,11 @@ namespace DeepStackClient
             return new Client(uri, apiKey);
         }
 
-        private async Task<T> IdentifyImage<T>(byte[] jpegImageData, string mode)
+        private async Task<T> IdentifyImage<T>(Stream jpegImageData, string mode)
         {
             using var request = new MultipartFormDataContent
             {
-                { new ByteArrayContent(jpegImageData), "image", "image.jpg" },
+                { new StreamContent(jpegImageData), "image", "image.jpg" },
                 { new StringContent(_apiKey), "api_key" }
             };
             var output = await _httpClient.PostAsync($"v1/vision/{mode}", request);
@@ -47,10 +48,17 @@ namespace DeepStackClient
 
         public async Task<IdentifiedScene> IdentifyScene(byte[] jpegImageData)
         {
-            return await IdentifyImage<IdentifiedScene>(jpegImageData, "scene");
+            using var bytes = new MemoryStream(jpegImageData);
+            return await IdentifyImage<IdentifiedScene>(bytes, "scene");
         }
 
         public async Task<IdentifiedObjects> IdentifyObjects(byte[] jpegImageData)
+        {
+            using var bytes = new MemoryStream(jpegImageData);
+            return await IdentifyImage<IdentifiedObjects>(bytes, "detection");
+        }
+
+        public async Task<IdentifiedObjects> IdentifyObjects(Stream jpegImageData)
         {
             return await IdentifyImage<IdentifiedObjects>(jpegImageData, "detection");
         }
