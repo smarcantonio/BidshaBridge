@@ -14,7 +14,7 @@ namespace DeepStackClient
             [JsonProperty("y_max")] int yMax,
             [JsonProperty("x_max")] int xMax)
         {
-            Label = label;
+            Label = label ?? string.Empty;
             Confidence = confidence;
             Location = new Rectangle(xMin, yMin, xMax - xMin, yMax - yMin);
         }

@@ -9,12 +9,11 @@ namespace DeepStackClient
             [JsonProperty("label")] string label,
             [JsonProperty("confidence")] float confidence)
         {
-            Label = label;
+            Label = label ?? string.Empty;
             Confidence = confidence;
         }
 
-        public string? Label { get; }
-        public float? Confidence { get; }
-        public string? Error { get; }
+        public string Label { get; }
+        public float Confidence { get; }
     }
 }
